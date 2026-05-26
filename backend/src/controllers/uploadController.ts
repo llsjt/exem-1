@@ -33,6 +33,11 @@ export function createUploadController(service: UploadService = uploadService, m
     mergeUpload: asyncHandler(async (req, res) => {
       const result = await merger.mergeUpload(req.body);
       res.json(result);
+    }),
+
+    cancelUpload: asyncHandler(async (req, res) => {
+      const result = await service.cancelUpload(req.params.fileHash);
+      res.json(result);
     })
   };
 }

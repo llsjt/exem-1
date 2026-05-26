@@ -12,6 +12,7 @@ export function createUploadRoutes(service: UploadService = uploadService, merge
   router.post('/chunks', uploadChunkMiddleware, controller.uploadChunk);
   router.post('/merge', controller.mergeUpload);
   router.get('/:fileHash/status', controller.getUploadStatus);
+  router.delete('/:fileHash', controller.cancelUpload);
 
   return router;
 }

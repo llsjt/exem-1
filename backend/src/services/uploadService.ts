@@ -1,3 +1,4 @@
+import { readFile, rm, unlink } from 'node:fs/promises';
 import { AppError } from '../types/errorTypes.js';
 import type { ChunkWriteResult } from '../types/uploadTypes.js';
 
@@ -45,6 +46,11 @@ export interface MergedFileInfo {
   fileUrl: string;
 }
 
+export interface CancelUploadResult {
+  fileHash: string;
+  canceled: true;
+}
+
 export interface UploadMeta {
   status?: UploadStatus;
   fileHash?: string;
@@ -66,6 +72,7 @@ export interface UploadStorageService {
   touchUploadMeta(fileHash: string, accessedAt: string): Promise<void>;
   writeUploadMeta?(meta: UploadMeta): Promise<void>;
   writeChunk?(params: { fileHash: string; chunkIndex: number; data: Uint8Array }): Promise<ChunkWriteResult>;
+  deleteChunkDir?(fileHash: string): Promise<void>;
 }
 
 export interface FilesystemStorageService {
@@ -76,12 +83,14 @@ export interface FilesystemStorageService {
   writeUploadMeta?(meta: UploadMeta): Promise<void>;
   updateUploadMeta(fileHash: string, updater: (current: UploadMeta) => UploadMeta | Promise<UploadMeta>): Promise<UploadMeta>;
   writeChunk?(params: { fileHash: string; chunkIndex: number; data: Uint8Array }): Promise<ChunkWriteResult>;
+  getChunkDir?(fileHash: string): string;
 }
 
 export interface UploadService {
   checkUpload(input: UploadCheckInput): Promise<UploadCheckResult>;
   uploadChunk(input: UploadChunkInput): Promise<UploadChunkResult>;
   getUploadStatus(fileHash: unknown): Promise<UploadStatusResult>;
+  cancelUpload(fileHash: unknown): Promise<CancelUploadResult>;
 }
 
 const fileHashPattern = /^[a-fA-F0-9]{32}$/;
@@ -212,7 +221,7 @@ function validateChunkInput(input: UploadChunkInput) {
 }
 
 function assertUploadStorage(storageService: UploadStorageService): asserts storageService is UploadStorageService &
-  Required<Pick<UploadStorageService, 'writeUploadMeta' | 'writeChunk'>> {
+  Required<Pick<UploadStorageService, 'writeUploadMeta' | 'writeChunk' | 'deleteChunkDir'>> {
   if (!storageService.writeUploadMeta || !storageService.writeChunk) {
     throw new AppError(500, 'STORAGE_ERROR', 'storage service does not support chunk writes');
   }
@@ -314,6 +323,14 @@ export function createUploadStorageAdapter(storageService: UploadStorageService 
       }
 
       return storageService.writeChunk(params);
+    },
+    async deleteChunkDir(fileHash) {
+      const fs = storageService as FilesystemStorageService;
+
+      if (fs.getChunkDir) {
+        await rm(fs.getChunkDir(fileHash), { recursive: true, force: true });
+        return;
+      }
     }
   };
 }
@@ -352,6 +369,13 @@ function createLazyStorageService(): UploadStorageService {
       const storage = await loadDefaultStorage();
       assertUploadStorage(storage);
       return storage.writeChunk(params);
+    },
+    async deleteChunkDir(fileHash) {
+      const storage = await loadDefaultStorage();
+
+      if (storage.deleteChunkDir) {
+        return storage.deleteChunkDir(fileHash);
+      }
     }
   };
 }
@@ -399,10 +423,23 @@ export function createUploadService(storageService: UploadStorageService = creat
         await storageService.writeUploadMeta(incomingMeta);
       }
 
+      // 适配 diskStorage：buffer 不存在时从磁盘读取分片内容。
+      let chunkData: Buffer;
+      if (validatedInput.chunk.buffer) {
+        chunkData = Buffer.isBuffer(validatedInput.chunk.buffer)
+          ? validatedInput.chunk.buffer
+          : Buffer.from(validatedInput.chunk.buffer);
+      } else if (validatedInput.chunk.path) {
+        chunkData = await readFile(validatedInput.chunk.path);
+        await unlink(validatedInput.chunk.path).catch(() => undefined);
+      } else {
+        throw new AppError(400, 'INVALID_ARGUMENT', 'chunk data is missing');
+      }
+
       await storageService.writeChunk({
         fileHash: validatedInput.fileHash,
         chunkIndex: validatedInput.chunkIndex,
-        data: validatedInput.chunk.buffer
+        data: chunkData
       });
 
       return {
@@ -450,6 +487,13 @@ export function createUploadService(storageService: UploadStorageService = creat
         uploadedChunks: sortedUploadedChunks,
         fileUrl: null
       };
+    },
+
+    async cancelUpload(rawFileHash) {
+      const fileHash = validateFileHash(rawFileHash);
+      // 只删除临时分片目录，不删除已合并的正式文件。
+      await storageService.deleteChunkDir?.(fileHash);
+      return { fileHash, canceled: true };
     }
   };
 }
