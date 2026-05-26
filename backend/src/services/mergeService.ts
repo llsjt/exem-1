@@ -99,6 +99,7 @@ function resultFromInput(input: ValidatedMergeInput): MergeResult {
 }
 
 async function readMergedResultIfExists(input: ValidatedMergeInput, storage: StorageService): Promise<MergeResult | null> {
+  // merge 接口必须幂等：正式文件已存在时直接返回，不重复合并和删除目录。
   if (!(await storage.mergedFileExists(input.fileHash))) {
     return null;
   }
@@ -115,6 +116,7 @@ async function readMergedResultIfExists(input: ValidatedMergeInput, storage: Sto
 }
 
 async function assertAllChunksExist(input: ValidatedMergeInput, storage: StorageService): Promise<void> {
+  // 合并前逐片确认完整性，缺任意一片都不能生成正式文件。
   for (let chunkIndex = 0; chunkIndex < input.totalChunks; chunkIndex += 1) {
     if (!(await storage.chunkExists(input.fileHash, chunkIndex))) {
       throw new AppError(400, 'MISSING_CHUNK', `Missing chunk ${chunkIndex}`, {
@@ -130,6 +132,7 @@ async function writeChunksToTempFile(input: ValidatedMergeInput, storage: Storag
   const output = createWriteStream(tempFilePath, { flags: 'w' });
 
   try {
+    // 按 chunkIndex 顺序流式写入，避免把大文件所有分片一次性读入内存。
     for (let chunkIndex = 0; chunkIndex < input.totalChunks; chunkIndex += 1) {
       const inputStream = createReadStream(storage.getChunkPath(input.fileHash, chunkIndex));
 
@@ -168,6 +171,7 @@ export function createMergeService(
           return mergedWhileWaiting;
         }
 
+        // 同一 fileHash 同时只能有一个合并流程，避免两个请求同时写 file.tmp/file。
         throw new AppError(409, 'MERGE_IN_PROGRESS', 'merge is already in progress', { fileHash: input.fileHash });
       }
 
@@ -189,6 +193,7 @@ export function createMergeService(
         }
 
         await assertAllChunksExist(input, storage);
+        // 标记 MERGING 后，清理任务会跳过该目录，避免合并过程中临时分片被删除。
         await storage.updateUploadMeta(input.fileHash, (current) => ({
           ...current,
           status: 'MERGING',
@@ -199,6 +204,7 @@ export function createMergeService(
         try {
           await rm(storage.getTempMergedFilePath(input.fileHash), { force: true });
           await writeChunksToTempFile(input, storage);
+          // file.tmp 完整写完后再 rename 成 file；正式 file 出现即代表可下载。
           await rename(storage.getTempMergedFilePath(input.fileHash), storage.getMergedFilePath(input.fileHash));
 
           const completedAt = new Date().toISOString();
@@ -216,6 +222,7 @@ export function createMergeService(
 
           return resultFromInput(input);
         } catch (error) {
+          // 合并失败只删除未完成的 file.tmp，保留分片目录便于修复后重新 merge。
           await rm(storage.getTempMergedFilePath(input.fileHash), { force: true });
           throw error;
         }

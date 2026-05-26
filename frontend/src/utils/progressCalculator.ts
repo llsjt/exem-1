@@ -55,6 +55,7 @@ export class UploadProgressCalculator {
 
     this.totalFileSize = options.totalFileSize;
 
+    // 进度按每个分片已上传字节数汇总，不用 completedChunks/totalChunks 粗略估算。
     for (const chunk of options.chunks) {
       assertNonNegativeInteger(chunk.index, 'chunk.index');
       assertNonNegativeInteger(chunk.size, 'chunk.size');
@@ -94,6 +95,7 @@ export class UploadProgressCalculator {
   resumeFromUploadedChunks(uploadedChunks: number[]): UploadingProgress {
     const confirmed = new Set(uploadedChunks);
 
+    // 续传时只信任后端 status 返回的分片；未确认分片进度重置为 0。
     for (const chunkIndex of this.chunkSizes.keys()) {
       this.chunkUploadedBytes.set(chunkIndex, confirmed.has(chunkIndex) ? this.getChunkSize(chunkIndex) : 0);
     }

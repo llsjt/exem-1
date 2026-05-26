@@ -136,6 +136,7 @@ function validateCheckInput(input: UploadCheckInput) {
   const totalChunks = validatePositiveInteger(input.totalChunks, 'totalChunks');
   const expectedTotalChunks = Math.ceil(fileSize / chunkSize);
 
+  // totalChunks 必须能由 fileSize/chunkSize 推导出来，防止前后端对分片数量理解不一致。
   if (totalChunks !== expectedTotalChunks) {
     throw new AppError(400, 'INVALID_ARGUMENT', 'totalChunks does not match fileSize and chunkSize', {
       fileSize,
@@ -181,6 +182,7 @@ function validateChunkInput(input: UploadChunkInput) {
   const actualChunkSize = input.chunk.size;
   const isLastChunk = chunkIndex === totalChunks - 1;
 
+  // 除最后一片外，分片大小必须固定；最后一片允许不足 chunkSize。
   if (!isLastChunk && actualChunkSize !== chunkSize) {
     throw new AppError(400, 'INVALID_ARGUMENT', 'chunk size must equal chunkSize for non-final chunks', {
       chunkIndex,
@@ -233,6 +235,7 @@ function createUploadMeta(input: ReturnType<typeof validateChunkInput>, now: str
 }
 
 function hasMetaConflict(existingMeta: UploadMeta, incomingMeta: UploadMeta): boolean {
+  // 同一个 fileHash 下的基础元信息必须稳定，否则会把不同文件的分片混在同一目录。
   return (
     existingMeta.fileHash !== incomingMeta.fileHash ||
     existingMeta.fileName !== incomingMeta.fileName ||
@@ -359,6 +362,7 @@ export function createUploadService(storageService: UploadStorageService = creat
       const { fileHash } = validateCheckInput(input);
       const mergedFile = await storageService.findMergedFile(fileHash);
 
+      // 秒传优先：正式合并文件存在时，不再关心临时分片目录。
       if (mergedFile) {
         return {
           exists: true,
@@ -382,6 +386,7 @@ export function createUploadService(storageService: UploadStorageService = creat
       const incomingMeta = createUploadMeta(validatedInput, now);
       const existingMeta = await storageService.readUploadMeta(validatedInput.fileHash);
 
+      // 首片负责创建 meta；后续分片只刷新活跃时间，并校验 meta 一致性。
       if (existingMeta) {
         if (hasMetaConflict(existingMeta, incomingMeta)) {
           throw new AppError(400, 'META_CONFLICT', 'upload metadata conflicts with existing metadata', {
@@ -410,6 +415,7 @@ export function createUploadService(storageService: UploadStorageService = creat
       const fileHash = validateFileHash(rawFileHash);
       const mergedFile = await storageService.findMergedFile(fileHash);
 
+      // 状态查询同样优先返回 MERGED，使前端恢复时能直接进入成功/下载路径。
       if (mergedFile) {
         return {
           fileHash,
@@ -435,6 +441,7 @@ export function createUploadService(storageService: UploadStorageService = creat
       }
 
       const status: UploadStatus = uploadMeta?.status === 'MERGING' ? 'MERGING' : 'UPLOADING';
+      // 用户查询状态通常意味着正在恢复上传，刷新 lastAccessedAt 防止清理任务误删。
       await storageService.touchUploadMeta(fileHash, new Date().toISOString());
 
       return {

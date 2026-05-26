@@ -346,6 +346,7 @@ export function createUploadStore(options: CreateUploadStoreOptions = {}) {
     clearTimer(taskId);
 
     try {
+      // 主流程：先拿 fileHash，再 check 秒传/续传状态，最后补传缺失分片并触发 merge。
       const fileHash = task.fileHash ?? await hashTaskFile(task);
       task.fileHash = fileHash;
 
@@ -356,6 +357,7 @@ export function createUploadStore(options: CreateUploadStoreOptions = {}) {
         : [];
 
       if (uploadedChunks.length === 0) {
+        // 非恢复场景先走 check；如果后端已有正式文件，前端直接秒传成功。
         const check = await dependencies.checkUpload(basePayload);
 
         if (check.exists) {
@@ -397,6 +399,7 @@ export function createUploadStore(options: CreateUploadStoreOptions = {}) {
     task.progress = 0;
     touch(task);
 
+    // Hash 阶段只更新指纹计算进度，上传字节进度在 uploadMissingChunks 中维护。
     return dependencies.hashFile(task.file, {
       chunkSize,
       onProgress(progress) {
@@ -433,6 +436,7 @@ export function createUploadStore(options: CreateUploadStoreOptions = {}) {
     const uploaded = new Set(uploadedChunks);
     const pendingChunks = chunks.filter((chunk) => !uploaded.has(chunk.index));
 
+    // 只调度后端尚未确认的分片，支撑暂停/失败后的断点续传。
     await scheduler.run(pendingChunks.map((chunk) => ({
       chunkIndex: chunk.index,
       run: async (signal) => {
@@ -440,6 +444,7 @@ export function createUploadStore(options: CreateUploadStoreOptions = {}) {
         const unsubscribe = client ? signal.onCancel(() => client.abortChunk(chunk.index)) : () => undefined;
 
         try {
+          // 每个分片的 onProgress 写入计算器，再汇总为整个文件的真实上传进度。
           const response = await (client
             ? client.uploadChunk(toChunkRequest(basePayload, chunk), {
                 onProgress(progress) {

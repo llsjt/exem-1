@@ -84,6 +84,7 @@ function getMetaActivityMs(meta: UploadMeta): number | null {
   const updatedAtMs = parseTimeMs(meta.updatedAt);
   const lastAccessedAtMs = parseTimeMs(meta.lastAccessedAt);
 
+  // 清理判断同时看 updatedAt 和 lastAccessedAt，状态查询也能延长临时目录寿命。
   if (updatedAtMs === null) {
     return lastAccessedAtMs;
   }
@@ -148,6 +149,7 @@ export function createCleanupService(options: CleanupServiceOptions = {}): Clean
         const chunkDir = path.join(config.chunksRoot, fileHash);
         result.scanned += 1;
 
+        // 正在上传或合并的目录由锁保护，清理任务不抢占。
         if (lockManager.isLocked(fileHash)) {
           result.skipped.push({ fileHash, reason: 'locked' });
           continue;
@@ -156,6 +158,7 @@ export function createCleanupService(options: CleanupServiceOptions = {}): Clean
         const metaPath = path.join(chunkDir, 'meta.json');
         const uploadMeta = await readUploadMeta(metaPath);
 
+        // MERGING 目录可能正在被 mergeService 读取，不能按过期目录删除。
         if (uploadMeta?.status === 'MERGING') {
           result.skipped.push({ fileHash, reason: 'merging' });
           continue;
@@ -169,6 +172,7 @@ export function createCleanupService(options: CleanupServiceOptions = {}): Clean
             continue;
           }
 
+          // 有分片但缺 meta 属于异常目录，记录后按目录 mtime 执行过期策略。
           logger.error('upload chunk metadata missing', { fileHash, chunkDir });
           activityMs = await getDirectoryLastModifiedMs(chunkDir);
         }

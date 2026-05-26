@@ -94,6 +94,7 @@ export class XhrUploadClient {
       return false;
     }
 
+    // 主动暂停/取消会记录 chunkIndex，onabort 中据此区分用户操作和网络异常。
     this.userAbortedChunks.add(chunkIndex);
     xhr.abort();
     return true;
@@ -113,6 +114,7 @@ export class XhrUploadClient {
 
     let lastError: unknown;
 
+    // 单片最多重试 maxRetries 次；主动 abort 不重试，直接交给上层状态机处理。
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
         return await this.uploadChunkOnce(request, options);
@@ -149,6 +151,7 @@ export class XhrUploadClient {
 
     return new Promise<ChunkUploadResponse>((resolve, reject) => {
       const cleanup = () => {
+        // 请求结束后立即移出 Map，避免暂停/取消时操作到已完成的 XHR。
         if (this.activeRequests.get(request.chunkIndex) === xhr) {
           this.activeRequests.delete(request.chunkIndex);
         }
@@ -159,6 +162,7 @@ export class XhrUploadClient {
           return;
         }
 
+        // 真实上传进度只能从 XMLHttpRequest.upload.onprogress 读取。
         options.onProgress?.({
           chunkIndex: request.chunkIndex,
           loaded: event.loaded,
@@ -190,6 +194,7 @@ export class XhrUploadClient {
       xhr.onabort = () => {
         cleanup();
 
+        // 浏览器 abort 事件既可能来自用户，也可能来自连接中断，这里保持语义区分。
         if (this.userAbortedChunks.has(request.chunkIndex)) {
           this.userAbortedChunks.delete(request.chunkIndex);
           reject(new ChunkUploadAbortedError(request.chunkIndex));

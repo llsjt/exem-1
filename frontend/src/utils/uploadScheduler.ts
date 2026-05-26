@@ -76,6 +76,7 @@ export class UploadScheduler {
       return Promise.reject(new Error('Upload scheduler is already running'));
     }
 
+    // 队列保存原始顺序，结果按 resultIndex 回填，避免并发完成顺序影响返回顺序。
     this.canceled = false;
     this.queue.length = 0;
     tasks.forEach((task, resultIndex) => {
@@ -122,6 +123,7 @@ export class UploadScheduler {
     this.paused = false;
     this.queue.length = 0;
 
+    // 取消时清空待派发队列，并通知所有运行中的任务中止对应 XHR。
     for (const signal of this.activeSignals) {
       signal.cancel();
     }
@@ -131,6 +133,7 @@ export class UploadScheduler {
   }
 
   private dispatch(): void {
+    // 自定义信号量：activeCount 小于 concurrency 时才继续派发新分片。
     while (!this.paused && !this.canceled && this.activeCount < this.concurrency && this.queue.length > 0) {
       const queued = this.queue.shift();
 
@@ -161,6 +164,7 @@ export class UploadScheduler {
       })
       .catch((error) => {
         if (!this.canceled) {
+          // 任一分片失败即停止继续派发，交给上层把任务置为 failed。
           this.canceled = true;
           this.queue.length = 0;
           this.rejectRun(error);

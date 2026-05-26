@@ -73,6 +73,7 @@ export async function calculateFileHash(
   const spark = new SparkMD5.ArrayBuffer();
   const totalChunks = Math.ceil(file.size / chunkSize);
 
+  // Worker 内按分片增量读取，避免大文件一次性进入内存。
   for (let index = 0; index < totalChunks; index += 1) {
     const start = index * chunkSize;
     const end = Math.min(start + chunkSize, file.size);
@@ -81,6 +82,7 @@ export async function calculateFileHash(
     spark.append(chunkBuffer);
 
     const loadedChunks = index + 1;
+    // Hash 进度按已读取分片数回传，上传进度由 XHR 单独计算，二者不混算。
     options.onProgress?.({
       type: 'progress',
       loadedChunks,
@@ -118,6 +120,7 @@ if (typeof window === 'undefined' && typeof workerGlobal.addEventListener === 'f
   workerGlobal.addEventListener('message', (event) => {
     const { file, chunkSize } = event.data;
 
+    // Worker 只负责计算指纹并发消息，具体上传编排交给 uploadStore/uploadScheduler。
     void hashFileAndPostMessages(file, (message) => workerGlobal.postMessage?.(message), chunkSize);
   });
 }
