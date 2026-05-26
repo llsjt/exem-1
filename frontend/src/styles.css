@@ -1,0 +1,315 @@
+:root {
+  color: #17212b;
+  background: #eef3f8;
+  font-family:
+    Inter, "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.upload-dropzone,
+.upload-task-list {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #d9e1eb;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(39, 55, 77, 0.08);
+}
+
+.upload-dropzone {
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  border-style: dashed;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.upload-dropzone--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.upload-dropzone__input {
+  display: none;
+}
+
+.upload-dropzone__content {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  width: 100%;
+}
+
+.upload-dropzone__eyebrow,
+.upload-task-list__header span,
+.upload-task__meta {
+  color: #596779;
+  font-size: 13px;
+}
+
+.upload-dropzone__eyebrow {
+  margin: 0;
+  font-weight: 700;
+}
+
+.upload-dropzone h1,
+.upload-task-list h2,
+.upload-task h3 {
+  letter-spacing: 0;
+}
+
+.upload-dropzone h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.upload-dropzone__copy {
+  max-width: 320px;
+  margin: 0;
+  color: #425166;
+  line-height: 1.6;
+}
+
+.upload-dropzone__button,
+.upload-task__actions button {
+  min-height: 38px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.upload-dropzone__button {
+  padding: 0 18px;
+}
+
+.upload-dropzone__button:hover,
+.upload-task__actions button:hover {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+.upload-dropzone__button:focus-visible,
+.upload-task__actions button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 2px;
+}
+
+.upload-task-list {
+  min-height: 360px;
+  padding: 18px;
+}
+
+.upload-task-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.upload-task-list h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.upload-task-list__empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  color: #65758a;
+  background: #f8fafc;
+}
+
+.upload-task-list__items {
+  display: grid;
+  gap: 12px;
+}
+
+.upload-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #e0e7ef;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.upload-task__main {
+  min-width: 0;
+}
+
+.upload-task__title-row,
+.upload-task__meta,
+.upload-task__actions {
+  display: flex;
+  align-items: center;
+}
+
+.upload-task__title-row {
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.upload-task h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-task__status {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #edf2f7;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.upload-task__status[data-status="uploading"],
+.upload-task__status[data-status="hashing"] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.upload-task__status[data-status="success"] {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.upload-task__status[data-status="failed"],
+.upload-task__status[data-status="canceled"] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.upload-task__status[data-status="paused"],
+.upload-task__status[data-status="merging"] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.upload-task__meta {
+  gap: 12px;
+  margin-top: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.upload-task__progress {
+  height: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7edf5;
+}
+
+.upload-task__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #10b981;
+  transition: width 180ms ease;
+}
+
+.upload-task__actions {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.upload-task__actions button {
+  min-width: 58px;
+  padding: 0 12px;
+}
+
+.upload-task__actions .button-secondary {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.upload-task__actions .button-secondary:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+@media (max-width: 780px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .upload-dropzone,
+  .upload-task-list {
+    min-height: auto;
+  }
+
+  .upload-task {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-task__actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell {
+    padding: 12px;
+  }
+
+  .upload-dropzone,
+  .upload-task-list {
+    padding: 14px;
+  }
+
+  .upload-dropzone h1 {
+    font-size: 24px;
+  }
+}

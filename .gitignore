@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+storage/
+backend/storage/
+*.part
+*.part.tmp
+*.tmp
+*.testblob
+*.tsbuildinfo
+frontend/tests/*.js
